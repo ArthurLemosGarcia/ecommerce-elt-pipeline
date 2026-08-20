@@ -12,10 +12,11 @@ from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import URL, create_engine, text
 
 RAW_DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
 SCHEMA = "raw"
+REQUIRED_ENV_VARS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
 
 
 def snake_case(name: str) -> str:
@@ -26,18 +27,34 @@ def snake_case(name: str) -> str:
 
 def build_engine():
     load_dotenv()
-    user = os.environ["POSTGRES_USER"]
-    password = os.environ["POSTGRES_PASSWORD"]
-    host = os.environ.get("POSTGRES_HOST", "localhost")
-    port = os.environ.get("POSTGRES_PORT", "5432")
-    db = os.environ["POSTGRES_DB"]
-    url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
+    missing = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
+    if missing:
+        print(
+            f"Missing required environment variable(s): {', '.join(missing)}.\n"
+            "Copy .env.example to .env and fill in your Postgres connection details."
+        )
+        sys.exit(1)
+
+    url = URL.create(
+        "postgresql+psycopg2",
+        username=os.environ["POSTGRES_USER"],
+        password=os.environ["POSTGRES_PASSWORD"],
+        host=os.environ.get("POSTGRES_HOST", "localhost"),
+        port=int(os.environ.get("POSTGRES_PORT", "5432")),
+        database=os.environ["POSTGRES_DB"],
+    )
     return create_engine(url)
 
 
 def load_csv(engine, csv_path: Path) -> tuple[str, int]:
     table_name = snake_case(csv_path.stem)
-    df = pd.read_csv(csv_path)
+
+    # Columns like zip code prefixes are numeric-looking but not numbers
+    # (leading zeros matter); force them to stay as strings.
+    header = pd.read_csv(csv_path, nrows=0).columns
+    dtype = {col: str for col in header if "zip_code" in snake_case(col)}
+
+    df = pd.read_csv(csv_path, dtype=dtype)
     df.columns = [snake_case(col) for col in df.columns]
     df.to_sql(
         table_name,
@@ -45,6 +62,7 @@ def load_csv(engine, csv_path: Path) -> tuple[str, int]:
         schema=SCHEMA,
         if_exists="replace",
         index=False,
+        chunksize=10_000,
     )
     return table_name, len(df)
 
@@ -53,6 +71,16 @@ def main():
     csv_files = sorted(RAW_DATA_DIR.glob("*.csv"))
     if not csv_files:
         print(f"No CSV files found in {RAW_DATA_DIR}. Nothing to load.")
+        sys.exit(1)
+
+    table_names = [snake_case(p.stem) for p in csv_files]
+    duplicates = {name for name in table_names if table_names.count(name) > 1}
+    if duplicates:
+        print(
+            "Multiple CSV files map to the same table name after "
+            f"snake_casing: {', '.join(sorted(duplicates))}. Rename the "
+            "source files so each maps to a distinct table."
+        )
         sys.exit(1)
 
     engine = build_engine()
