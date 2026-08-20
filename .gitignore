@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Environment
+.env
+
+# Raw data (user-provided, not versioned)
+data/raw/*
+!data/raw/.gitkeep
+
+# dbt
+dbt/ecommerce/target/
+dbt/ecommerce/dbt_packages/
+dbt/ecommerce/logs/
+.user.yml
+
+# Streamlit
+.streamlit/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
