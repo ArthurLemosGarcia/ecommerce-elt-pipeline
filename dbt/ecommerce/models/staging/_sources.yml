@@ -1,0 +1,19 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: >
+      Raw Olist e-commerce CSVs loaded as-is by ingestion/load_raw.py.
+      One table per source file, column names snake_cased, no
+      transformations applied yet.
+    tables:
+      - name: olist_customers_dataset
+      - name: olist_orders_dataset
+      - name: olist_order_items_dataset
+      - name: olist_order_payments_dataset
+      - name: olist_order_reviews_dataset
+      - name: olist_products_dataset
+      - name: olist_sellers_dataset
+      - name: olist_geolocation_dataset
+      - name: product_category_name_translation
