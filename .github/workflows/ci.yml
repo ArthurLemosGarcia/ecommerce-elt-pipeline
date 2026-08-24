@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  dbt-build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ecommerce
+          POSTGRES_PASSWORD: ecommerce
+          POSTGRES_DB: ecommerce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ecommerce -d ecommerce"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_USER: ecommerce
+      POSTGRES_PASSWORD: ecommerce
+      POSTGRES_DB: ecommerce
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      CUSTOMER_ID_HASH_SALT: ci-salt
+      DBT_PROFILES_DIR: ${{ github.workspace }}/dbt/ecommerce
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Uses a small, referentially-consistent sample of the real Olist
+      # dataset (300 orders and everything they reference) committed under
+      # ci/sample_data/ -- the full dataset is never committed (see
+      # PROJECT_SPEC.md section 15) and is too slow to load on every push.
+      - name: Stage sample data for ingestion
+        run: |
+          mkdir -p data/raw
+          cp ci/sample_data/*.csv data/raw/
+
+      - name: Load sample data into raw schema
+        run: python ingestion/load_raw.py
+
+      - name: dbt build (run + test)
+        working-directory: dbt/ecommerce
+        run: dbt build
