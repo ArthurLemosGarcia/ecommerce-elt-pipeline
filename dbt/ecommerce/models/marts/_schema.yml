@@ -1,0 +1,91 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: >
+      One row per customer_id (order-level customer key). Includes
+      state and IBGE region; customer identifiers are hashed upstream
+      in stg_customers.
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+          - unique
+      - name: state
+        tests:
+          - not_null
+
+  - name: dim_sellers
+    description: One row per seller, including state and IBGE region.
+    columns:
+      - name: seller_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_products
+    description: One row per product, including the English category name.
+    columns:
+      - name: product_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_dates
+    description: >
+      One row per calendar date, spanning every purchase, delivery,
+      and estimated-delivery date referenced by fct_order_items.
+    columns:
+      - name: date_key
+        tests:
+          - not_null
+          - unique
+
+  - name: fct_order_items
+    description: >
+      One row per order item. Delivery metrics (delivery_time_days,
+      is_late) are derived from purchase/delivery timestamps;
+      review_score is the order's average review score, repeated
+      across its items.
+    columns:
+      - name: order_item_key
+        description: Surrogate key, hash of (order_id, order_item_id).
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+      - name: product_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_id
+      - name: seller_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_sellers')
+                field: seller_id
+      - name: purchase_date_key
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_dates')
+                field: date_key
+      - name: delivered_date_key
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_dates')
+                field: date_key
+      - name: price
+        tests:
+          - not_null
+      - name: freight_value
+        tests:
+          - not_null

@@ -56,6 +56,14 @@ def load_csv(engine, csv_path: Path) -> tuple[str, int]:
 
     df = pd.read_csv(csv_path, dtype=dtype)
     df.columns = [snake_case(col) for col in df.columns]
+
+    # Plain if_exists="replace" issues a bare DROP TABLE, which fails once
+    # anything downstream (e.g. a dbt staging view) depends on this table.
+    # Drop with CASCADE first so re-running ingestion after a dbt build
+    # still works; dependent views just need `dbt run` again afterward.
+    with engine.begin() as conn:
+        conn.execute(text(f'DROP TABLE IF EXISTS {SCHEMA}."{table_name}" CASCADE'))
+
     df.to_sql(
         table_name,
         engine,

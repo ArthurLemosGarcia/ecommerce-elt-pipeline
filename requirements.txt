@@ -1,4 +1,8 @@
 pandas==2.3.3
 SQLAlchemy==2.0.52
 psycopg2-binary==2.9.12
-python-dotenv==1.0.1
+python-dotenv==1.2.3
+dbt-core==1.12.3  # pinned explicitly: resolving dbt-postgres alone can pick an
+                  # older dbt-core whose pinned mashumaro fails to import on
+                  # Python 3.14; this combination is verified working
+dbt-postgres==1.11.0

@@ -1,0 +1,117 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: >
+      One row per customer_id (order-level customer key in the source
+      data). Identifiers are salted and hashed -- see docs/governance.md.
+    columns:
+      - name: customer_id
+        description: Hashed order-level customer identifier.
+        tests:
+          - not_null
+          - unique
+      - name: customer_unique_id
+        description: >
+          Hashed identifier linking multiple customer_id rows to the
+          same real-world customer.
+        tests:
+          - not_null
+
+  - name: stg_orders
+    description: One row per order, with timestamps cast and customer_id hashed.
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+          - unique
+      - name: order_status
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - approved
+                  - canceled
+                  - created
+                  - delivered
+                  - invoiced
+                  - processing
+                  - shipped
+                  - unavailable
+
+  - name: stg_order_items
+    description: One row per order item, with price/freight as numeric types.
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+      - name: order_item_id
+        tests:
+          - not_null
+      - name: price
+        tests:
+          - not_null
+      - name: freight_value
+        tests:
+          - not_null
+
+  - name: stg_order_payments
+    description: One row per payment installment/method applied to an order.
+
+  - name: stg_order_reviews
+    description: >
+      One row per review, deduplicated by review_id (kept the most
+      recently answered row when the source has duplicates).
+    columns:
+      - name: review_id
+        tests:
+          - not_null
+          - unique
+      - name: order_id
+        tests:
+          - not_null
+      - name: review_score
+        tests:
+          - not_null
+
+  - name: stg_products
+    description: >
+      One row per product, enriched with the English category name
+      via the translation source (falls back to the Portuguese name,
+      then 'unknown', when no translation exists).
+    columns:
+      - name: product_id
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_sellers
+    description: One row per seller.
+    columns:
+      - name: seller_id
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_geolocation
+    description: >
+      One row per zip code prefix (source has ~1M rows collapsing to
+      ~19k distinct prefixes); coordinates are averaged, city/state
+      pick one representative row per prefix.
+    columns:
+      - name: zip_code_prefix
+        tests:
+          - not_null
+          - unique
+
+seeds:
+  - name: state_region_mapping
+    description: Static lookup mapping each Brazilian state (UF) to its IBGE macro-region.
+    columns:
+      - name: state
+        tests:
+          - not_null
+          - unique
+      - name: region
+        tests:
+          - not_null
